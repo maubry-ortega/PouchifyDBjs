@@ -22,11 +22,16 @@ export abstract class PouchifyModel<T extends Document> {
     this.db = dbInstance;
   }
 
+  static getDatabase(): PouchDB.Database {
+    if (!this.db) throw new Error("Database not initialized");
+    return this.db;
+  }
+
   /**
    * Genera un ID único si no se especifica uno.
    */
   private static generateId(data: Document): string {
-    return data._id || uuidv4();
+    return data._id || uuidv4(); // Genera un UUID si no se proporciona _id
   }
 
   /**
@@ -55,23 +60,28 @@ export abstract class PouchifyModel<T extends Document> {
   static async save<T extends Document>(data: T): Promise<T> {
     if (!this.db) throw new Error("Database not initialized");
 
+    // Asegurarse de que se asigna un _id si no está presente
+    if (!data._id) {
+      data._id = uuidv4();
+    }
+
     // Siempre valida los datos antes de proceder
     this.validate(data); // Validación que falla si no hay _id
 
     try {
-        // Intenta obtener el documento existente
-        const existingDoc = await this.db.get(data._id!);
-        const updatedDoc = { ...existingDoc, ...data };
-        const response = await this.db.put(updatedDoc);
-        return { ...updatedDoc, _id: response.id, _rev: response.rev } as T;
+      // Intenta obtener el documento existente
+      const existingDoc = await this.db.get(data._id!);
+      // Merge del documento existente con los nuevos datos
+      const updatedDoc = { ...existingDoc, ...data, _id: data._id, _rev: existingDoc._rev };
+      const response = await this.db.put(updatedDoc);
+      return { ...updatedDoc, _id: response.id, _rev: response.rev } as T;
     } catch (err: any) {
-        if (err.status === 404) {
-            // Si el documento no existe, lo crea
-            const response = await this.db.put(data);
-            return { ...data, _id: response.id, _rev: response.rev } as T;
-        }
-        // Si hay otro error, lo lanza
-        throw err;
+      if (err.status === 404) {
+        // Si no existe, crea un nuevo documento
+        const response = await this.db.put(data);
+        return { ...data, _id: response.id, _rev: response.rev } as T;
+      }
+      throw err;
     }
   }
 
@@ -103,8 +113,16 @@ export abstract class PouchifyModel<T extends Document> {
    */
   static async remove<T extends Document>(id: string): Promise<void> {
     if (!this.db) throw new Error("Database not initialized");
-    const doc = await this.db.get(id);
-    await this.db.remove(doc);
+  
+    try {
+      const doc = await this.db.get(id);
+      await this.db.remove(doc);
+    } catch (err: any) {
+      if (err.status === 404) {
+        throw new Error(`No se encontró el documento con ID: ${id}`);
+      }
+      throw err;
+    }
   }
 
   /**
@@ -132,7 +150,12 @@ export abstract class PouchifyModel<T extends Document> {
    */
   static async query<T extends Document>(selector: PouchDB.Find.Selector): Promise<T[]> {
     if (!this.db) throw new Error("Database not initialized");
-    const result = await this.db.find({ selector });
-    return result.docs as T[];
+    
+    try {
+      const result = await this.db.find({ selector });
+      return result.docs as T[];
+    } catch (err: any) {
+      throw new Error(`Error en la consulta: ${err.message}`);
+    }
   }
 }

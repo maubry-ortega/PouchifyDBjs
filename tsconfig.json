@@ -9,7 +9,7 @@
         "outDir": "./dist",
         "rootDir": "./src",
         "baseUrl": "./src",
-        "resolveJsonModule": true
+        "resolveJsonModule": true,
     },
     "include": ["src/**/*"]
 }
