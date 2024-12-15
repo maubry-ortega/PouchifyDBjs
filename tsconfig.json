@@ -1,12 +1,15 @@
 {
     "compilerOptions": {
-    "target": "ES6",
-    "module": "CommonJS",
-    "strict": true,
-    "outDir": "./dist",
-    "rootDir": "./src",
-    "esModuleInterop": true,
-    "skipLibCheck": true
+        "target": "ESNext",
+        "module": "ESNext",
+        "strict": true,
+        "moduleResolution": "node",
+        "esModuleInterop": true,
+        "skipLibCheck": true,
+        "outDir": "./dist",
+        "rootDir": "./src",
+        "baseUrl": "./src",
+        "resolveJsonModule": true
     },
     "include": ["src/**/*"]
 }

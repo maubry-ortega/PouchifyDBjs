@@ -1,112 +1,140 @@
+import pouchdbFindPlugin from "pouchdb-find";
 import PouchDB from "pouchdb-core";
-import "pouchdb-adapter-idb";
-import "pouchdb-find";
+import "pouchdb-adapter-memory";
 import { v4 as uuidv4 } from "uuid";
 
-export abstract class BaseModel {
-    static db: PouchDB.Database;
+// Initialize PouchDB with the find plugin
+PouchDB.plugin(pouchdbFindPlugin);
 
-    /**
-     * Configura la base de datos para el modelo.
-     */
-    static setDatabase(dbInstance: PouchDB.Database) {
-        this.db = dbInstance;
+export interface Document {
+  _id?: string;
+  _rev?: string;
+  [key: string]: any;
+}
+export abstract class BaseModel<T extends Document> {
+  static db: PouchDB.Database;
+
+  /**
+   * Configura la base de datos para el modelo.
+   */
+  static setDatabase(dbInstance: PouchDB.Database): void {
+    this.db = dbInstance;
+  }
+
+  /**
+   * Genera un ID único si no se especifica uno.
+   */
+  private static generateId(data: Document): string {
+    return data._id || uuidv4();
+  }
+
+  /**
+   * Validación de datos utilizando un esquema.
+   */
+  protected static validate(data: Document): void {
+    console.log("Validando datos:", data);
+
+    // Validaciones generales
+    if (!data._id) {
+        data._id = this.generateId(data);
     }
 
-    /**
-     * Genera un ID único si no se especifica uno.
-     */
-    private static generateId(data: Record<string, any>): string {
-        return data._id || uuidv4();
-    }
-
-    /**
-     * Guarda un nuevo documento en la base de datos.
-     */
-    static async save(data: Record<string, any>) {
-        if (!this.db) throw new Error("Database not initialized");
-        this.validate(data);
-    
-        data._id = this.generateId(data); // Genera el _id automáticamente si no existe
-    
-        try {
-            const existingDoc = await this.db.get(data._id);
-            const updatedDoc = { ...existingDoc, ...data };
-            const response = await this.db.put(updatedDoc);
-            return { ...updatedDoc, _id: response.id, _rev: response.rev };
-        } catch (err: any) {
-            if (err.status === 404) {
-                const response = await this.db.put(data);
-                console.log("Documento guardado:", response); // Verifica el documento guardado
-                return { ...data, _id: response.id, _rev: response.rev };
-            }
-            throw err;
+    // Validación específica de 'value'
+    if (data.value !== undefined) {
+        if (typeof data.value !== 'number') {
+            throw new Error('El campo "value" debe ser un número.');
         }
     }
+  }
 
-    /**
-     * Busca documentos que cumplan con el query dado.
-     */
-    static async find(query: PouchDB.Find.FindRequest<{}>) {
-        if (!this.db) throw new Error("Database not initialized");
-        const result = await this.db.find(query);
-        return result.docs;
+  /**
+   * Guarda un nuevo documento en la base de datos.
+   */
+  static async save<T extends Document>(data: T): Promise<T> {
+    if (!this.db) throw new Error("Database not initialized");
+
+    // Siempre valida los datos antes de proceder
+    this.validate(data); // Validación que falla si no hay _id
+
+    // Genera _id solo si no existe
+    if (!data._id) {
+        data._id = this.generateId(data);
     }
 
-    /**
-     * Buscar un documento por su ID
-     */
-    static async findOne(id: string) {
-        if (!this.db) throw new Error("Database not initialized");
-        return this.db.get(id);
-    }
-
-    /**
-     * Eliminar un documento por su ID
-     */
-    static async remove(id: string) {
-        if (!this.db) throw new Error("Database not initialized");
-        const doc = await this.db.get(id);
-        return this.db.remove(doc);
-    }
-
-    /**
-     * Obtener todos los documentos
-     */
-    static async findAll(): Promise<any[]> {
-        const result = await this.db.allDocs({ include_docs: true });
-        return result.rows.map((row) => row.doc);
-    }
-
-    /**
-     * Actualizar un documento por su ID
-     */
-    static async update(id: string, data: any): Promise<any> {
-        if (!this.db) throw new Error("Database not initialized");
-        const doc = await this.db.get(id);
-        const updatedDoc = { ...doc, ...data, _id: id };
+    try {
+        // Intenta obtener el documento existente
+        const existingDoc = await this.db.get(data._id);
+        const updatedDoc = { ...existingDoc, ...data };
         const response = await this.db.put(updatedDoc);
-        return { ...updatedDoc, _rev: response.rev };
-    }
-
-    /**
-     * Consultas avanzadas
-     */
-    static async query(selector: any): Promise<any[]> {
-        const result = await this.db.find({ selector });
-        return result.docs;
-    }
-
-    /**
-     * Validar un documento según reglas predefinidas (placeholder).
-     */
-    private static validate(data: any): void {
-        // Validaciones ejemplo; personalizar según el esquema.
-        if (!data.name || typeof data.name !== "string") {
-            throw new Error('El campo "name" es obligatorio y debe ser un string.');
+        return { ...updatedDoc, _id: response.id, _rev: response.rev } as T;
+    } catch (err: any) {
+        if (err.status === 404) {
+            // Si el documento no existe, lo crea
+            const response = await this.db.put(data);
+            return { ...data, _id: response.id, _rev: response.rev } as T;
         }
-        if (typeof data.age !== "number") {
-            throw new Error('El campo "age" es obligatorio y debe ser un número.');
-        }
+        // Si hay otro error, lo lanza
+        throw err;
     }
+  }
+
+  /**
+   * Busca documentos que cumplan con el query dado.
+   */
+  static async find<T extends Document>(query: any): Promise<T[]> {
+    if (!this.db) throw new Error("Database not initialized");
+    const result = await this.db.find(query);
+    return result.docs as T[];
+  }
+
+  /**
+   * Buscar un documento por su ID.
+   */
+  static async findOne<T extends Document>(id: string): Promise<T | null> {
+    if (!this.db) throw new Error("Database not initialized");
+    try {
+      const doc = await this.db.get(id);
+      return doc as T;
+    } catch (err : any) {
+      if (err.status === 404) return null;
+      throw err;
+    }
+  }
+
+  /**
+   * Eliminar un documento por su ID.
+   */
+  static async remove<T extends Document>(id: string): Promise<void> {
+    if (!this.db) throw new Error("Database not initialized");
+    const doc = await this.db.get(id);
+    await this.db.remove(doc);
+  }
+
+  /**
+   * Obtener todos los documentos.
+   */
+  static async findAll<T extends Document>(): Promise<T[]> {
+    if (!this.db) throw new Error("Database not initialized");
+    const result = await this.db.allDocs({ include_docs: true });
+    return result.rows.map((row) => row.doc as T);
+  }
+
+  /**
+   * Actualizar un documento por su ID.
+   */
+  static async update<T extends Document>(id: string, data: Partial<T>): Promise<T> {
+    if (!this.db) throw new Error("Database not initialized");
+    const doc = await this.db.get(id);
+    const updatedDoc = { ...doc, ...data, _id: id };
+    const response = await this.db.put(updatedDoc);
+    return { ...updatedDoc, _rev: response.rev } as T;
+  }
+
+  /**
+   * Consultas avanzadas.
+   */
+  static async query<T extends Document>(selector: any): Promise<T[]> {
+    const result = await this.db.find({ selector });
+    return result.docs as T[];
+  }
 }

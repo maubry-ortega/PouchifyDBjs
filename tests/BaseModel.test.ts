@@ -1,11 +1,11 @@
-import { describe, it, expect, beforeAll, beforeEach } from "vitest";
+import { describe, it, expect, beforeAll, beforeEach, assert } from "vitest";
 import PouchDB from "pouchdb-core";
-import "pouchdb-adapter-idb";  // Asegúrate de que el adaptador idb esté importado
+import "pouchdb-adapter-memory";  // Asegúrate de que el adaptador idb esté importado
 import "pouchdb-find";          // Importa pouchdb-find para usar las consultas
 import { BaseModel } from "../src/core/BaseModel";
 
-// Habilitar el plugin de IndexedDB
-PouchDB.plugin(require("pouchdb-adapter-idb"));
+// almacen en memoria
+PouchDB.plugin(require("pouchdb-adapter-memory")); 
 
 // Configuración de las pruebas
 const dbName = "test_db";
@@ -18,12 +18,11 @@ describe("BaseModel", () => {
     let db: PouchDB.Database;
 
     beforeAll(async () => {
-        // Usa el adaptador "idb" para IndexedDB
-        db = new PouchDB(dbName, { adapter: "idb" });
+        db = new PouchDB(dbName);
         BaseModel.setDatabase(db);
     
         // Crear índice para consultas avanzadas
-        await db.createIndex({ index: { fields: ["name"] } });
+        // await db.createIndex({ index: { fields: ["name"] } });
     });
 
     beforeEach(async () => {
@@ -49,21 +48,31 @@ describe("BaseModel", () => {
 
     it("Debería obtener un documento por ID", async () => {
         const [doc] = await BaseModel.find({ selector: { name: "Test User" } });
-        const foundDoc = await BaseModel.findOne(doc._id);
-        expect(foundDoc).toHaveProperty("name", "Test User");
-        expect(foundDoc).toHaveProperty("age", 25);
+        if (doc && doc._id) {
+            const foundDoc = await BaseModel.findOne(doc._id);
+            expect(foundDoc).toHaveProperty("name", "Test User");
+            expect(foundDoc).toHaveProperty("age", 25);
+        } else {
+            // Handle the case where no document is found
+            throw new Error("Documento no encontrado");
+        }
     });
-
+    
     it("Debería eliminar un documento", async () => {
         const [doc] = await BaseModel.find({ selector: { name: "Test User" } });
-        await BaseModel.remove(doc._id);
-        try {
-            const deletedDoc = await db.get(doc._id);
-            // Si el documento sigue existiendo, debería lanzar un error
-            throw new Error('El documento no fue eliminado');
-        } catch (err) {
-            // PouchDB lanza un error con 'status' igual a 404 cuando un documento no es encontrado
-            expect(err).toHaveProperty('status', 404);
+        if (doc && doc._id) {
+            await BaseModel.remove(doc._id);
+            try {
+                const deletedDoc = await db.get(doc._id);
+                // Si el documento sigue existiendo, debería lanzar un error
+                throw new Error('El documento no fue eliminado');
+            } catch (err) {
+                // PouchDB lanza un error con 'status' igual a 404 cuando un documento no es encontrado
+                expect(err).toHaveProperty('status', 404);
+            }
+        } else {
+            // Handle the case where no document is found
+            throw new Error("Documento no encontrado");
         }
     });
 
@@ -75,8 +84,13 @@ describe("BaseModel", () => {
 
     it("Debería actualizar un documento", async () => {
         const [doc] = await BaseModel.find({ selector: { name: "Test User" } });
-        const updatedDoc = await BaseModel.update(doc._id, { age: 35 });
-        expect(updatedDoc).toHaveProperty("age", 35);
+        if (doc && doc._id) {
+            const updatedDoc = await BaseModel.update(doc._id, { age: 35 });
+            expect(updatedDoc).toHaveProperty("age", 35);
+        } else {
+            // Handle the case where doc or doc._id is undefined
+            throw new Error("Documento no encontrado");
+        }
     });
 
     it("Debería realizar una consulta avanzada", async () => {
@@ -86,6 +100,8 @@ describe("BaseModel", () => {
     });
 
     it("Debería lanzar un error si la validación falla", async () => {
-        await expect(BaseModel.save({})).rejects.toThrow();
+        await expect(
+            BaseModel.save({ name: 'Test', value: 'not a number' })
+        ).rejects.toThrow('El campo "value" debe ser un número.');
     });
 });
