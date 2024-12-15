@@ -1,8 +1,8 @@
-import { describe, it, expect, beforeAll, beforeEach, assert } from "vitest";
+import { describe, it, expect, beforeAll, beforeEach } from "vitest";
 import PouchDB from "pouchdb-core";
 import "pouchdb-adapter-memory";  // Asegúrate de que el adaptador idb esté importado
 import "pouchdb-find";          // Importa pouchdb-find para usar las consultas
-import { BaseModel } from "../src/core/BaseModel";
+import { PouchifyModel } from "../src/core/PouchifyModel";
 
 // almacen en memoria
 PouchDB.plugin(require("pouchdb-adapter-memory")); 
@@ -14,12 +14,12 @@ const testDocs = [
     { name: "Test User 2", age: 30 },
 ];
 
-describe("BaseModel", () => {
+describe("PouchifyModel", () => {
     let db: PouchDB.Database;
 
     beforeAll(async () => {
         db = new PouchDB(dbName);
-        BaseModel.setDatabase(db);
+        PouchifyModel.setDatabase(db);
     
         // Crear índice para consultas avanzadas
         // await db.createIndex({ index: { fields: ["name"] } });
@@ -33,23 +33,23 @@ describe("BaseModel", () => {
             _rev: row.value.rev,
             _deleted: true,
         }));
-        if (deletions.length > 0) await db.bulkDocs(deletions);
+        if (deletions.length) await db.bulkDocs(deletions);
 
         // Crear documentos de prueba
-        await Promise.all(testDocs.map((doc) => BaseModel.save(doc)));
+        await Promise.all(testDocs.map((doc) => PouchifyModel.save(doc)));
     });
 
     it("Debería guardar un documento", async () => {
-        const doc = await BaseModel.save({ name: "New User", age: 22 });
+        const doc = await PouchifyModel.save({ name: "New User", age: 22 });
         expect(doc).toHaveProperty("_id");
         expect(doc).toHaveProperty("_rev");
         expect(doc.name).toBe("New User");
     });
 
     it("Debería obtener un documento por ID", async () => {
-        const [doc] = await BaseModel.find({ selector: { name: "Test User" } });
+        const [doc] = await PouchifyModel.find({ selector: { name: "Test User" } });
         if (doc && doc._id) {
-            const foundDoc = await BaseModel.findOne(doc._id);
+            const foundDoc = await PouchifyModel.findOne(doc._id);
             expect(foundDoc).toHaveProperty("name", "Test User");
             expect(foundDoc).toHaveProperty("age", 25);
         } else {
@@ -59,9 +59,9 @@ describe("BaseModel", () => {
     });
     
     it("Debería eliminar un documento", async () => {
-        const [doc] = await BaseModel.find({ selector: { name: "Test User" } });
+        const [doc] = await PouchifyModel.find({ selector: { name: "Test User" } });
         if (doc && doc._id) {
-            await BaseModel.remove(doc._id);
+            await PouchifyModel.remove(doc._id);
             try {
                 const deletedDoc = await db.get(doc._id);
                 // Si el documento sigue existiendo, debería lanzar un error
@@ -77,15 +77,15 @@ describe("BaseModel", () => {
     });
 
     it("Debería obtener todos los documentos", async () => {
-        const docs = await BaseModel.findAll();
+        const docs = await PouchifyModel.findAll();
         expect(docs).toHaveLength(testDocs.length);
         expect(docs[0]).toHaveProperty("name");
     });
 
     it("Debería actualizar un documento", async () => {
-        const [doc] = await BaseModel.find({ selector: { name: "Test User" } });
+        const [doc] = await PouchifyModel.find({ selector: { name: "Test User" } });
         if (doc && doc._id) {
-            const updatedDoc = await BaseModel.update(doc._id, { age: 35 });
+            const updatedDoc = await PouchifyModel.update(doc._id, { age: 35 });
             expect(updatedDoc).toHaveProperty("age", 35);
         } else {
             // Handle the case where doc or doc._id is undefined
@@ -94,14 +94,14 @@ describe("BaseModel", () => {
     });
 
     it("Debería realizar una consulta avanzada", async () => {
-        const results = await BaseModel.query({ name: { $eq: "Test User" } });
+        const results = await PouchifyModel.query({ name: { $eq: "Test User" } });
         expect(results).toHaveLength(1);
         expect(results[0]).toHaveProperty("name", "Test User");
     });
 
     it("Debería lanzar un error si la validación falla", async () => {
         await expect(
-            BaseModel.save({ name: 'Test', value: 'not a number' })
+            PouchifyModel.save({ name: 'Test', value: 'not a number' })
         ).rejects.toThrow('El campo "value" debe ser un número.');
     });
 });

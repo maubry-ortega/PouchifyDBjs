@@ -11,7 +11,8 @@ export interface Document {
   _rev?: string;
   [key: string]: any;
 }
-export abstract class BaseModel<T extends Document> {
+
+export abstract class PouchifyModel<T extends Document> {
   static db: PouchDB.Database;
 
   /**
@@ -29,7 +30,8 @@ export abstract class BaseModel<T extends Document> {
   }
 
   /**
-   * Validación de datos utilizando un esquema.
+   * Validación generica de datos.
+   * sobreescrita por cada modelo específico
    */
   protected static validate(data: Document): void {
     console.log("Validando datos:", data);
@@ -56,14 +58,9 @@ export abstract class BaseModel<T extends Document> {
     // Siempre valida los datos antes de proceder
     this.validate(data); // Validación que falla si no hay _id
 
-    // Genera _id solo si no existe
-    if (!data._id) {
-        data._id = this.generateId(data);
-    }
-
     try {
         // Intenta obtener el documento existente
-        const existingDoc = await this.db.get(data._id);
+        const existingDoc = await this.db.get(data._id!);
         const updatedDoc = { ...existingDoc, ...data };
         const response = await this.db.put(updatedDoc);
         return { ...updatedDoc, _id: response.id, _rev: response.rev } as T;
@@ -133,7 +130,8 @@ export abstract class BaseModel<T extends Document> {
   /**
    * Consultas avanzadas.
    */
-  static async query<T extends Document>(selector: any): Promise<T[]> {
+  static async query<T extends Document>(selector: PouchDB.Find.Selector): Promise<T[]> {
+    if (!this.db) throw new Error("Database not initialized");
     const result = await this.db.find({ selector });
     return result.docs as T[];
   }
