@@ -2,10 +2,10 @@ import { describe, it, expect, beforeAll, beforeEach } from "vitest";
 import PouchDB from "pouchdb-core";
 import "pouchdb-adapter-memory";  // Asegúrate de que el adaptador idb esté importado
 import "pouchdb-find";          // Importa pouchdb-find para usar las consultas
-import { PouchifyModel } from "../src/core/PouchifyModel";
+import { PouchifyModel } from "../core/PouchifyModel";
 
 // almacen en memoria
-PouchDB.plugin(require("pouchdb-adapter-memory")); 
+PouchDB.plugin(require("pouchdb-adapter-memory"));
 
 // Configuración de las pruebas
 const dbName = "test_db";
@@ -20,7 +20,7 @@ describe("PouchifyModel", () => {
     beforeAll(async () => {
         db = new PouchDB(dbName);
         PouchifyModel.setDatabase(db);
-    
+
         // Crear índice para consultas avanzadas
         // await db.createIndex({ index: { fields: ["name"] } });
     });
@@ -57,11 +57,11 @@ describe("PouchifyModel", () => {
             throw new Error("Documento no encontrado");
         }
     });
-    
+
     it("Debería eliminar un documento", async () => {
         const [doc] = await PouchifyModel.find({ selector: { name: "Test User" } });
         if (doc && doc._id) {
-            await PouchifyModel.remove(doc._id);
+            await PouchifyModel.delete(doc._id);
             try {
                 const deletedDoc = await db.get(doc._id);
                 // Si el documento sigue existiendo, debería lanzar un error

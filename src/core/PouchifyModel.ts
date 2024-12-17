@@ -2,18 +2,18 @@ import pouchdbFindPlugin from "pouchdb-find";
 import PouchDB from "pouchdb-core";
 import "pouchdb-adapter-memory";
 import { v4 as uuidv4 } from "uuid";
+import { Schema } from './Schema';
 
 // Initialize PouchDB with the find plugin
 PouchDB.plugin(pouchdbFindPlugin);
 
-export interface Document {
-  _id?: string;
-  _rev?: string;
-  [key: string]: any;
+interface RelatedModel<T extends Document> {
+  findOne(id: string): Promise<T | null>;
 }
 
 export abstract class PouchifyModel<T extends Document> {
   static db: PouchDB.Database;
+  static schema: Schema;
 
   /**
    * Configura la base de datos para el modelo.
@@ -52,6 +52,13 @@ export abstract class PouchifyModel<T extends Document> {
             throw new Error('El campo "value" debe ser un número.');
         }
     }
+    if (!this.schema) throw new Error("Schema not defined for this model");
+
+    // Aplica validación usando el esquema
+    const { valid, errors } = this.schema.validate(data);
+    if (!valid) {
+      throw new Error(`Validation failed: ${errors.join(", ")}`);
+    }
   }
 
   /**
@@ -86,6 +93,36 @@ export abstract class PouchifyModel<T extends Document> {
   }
 
   /**
+   * Carga relaciones basadas en esquemas.
+   */
+  static async populate<T extends Document>(doc: T): Promise<T> {
+      if (!this.db) throw new Error("Database not initialized");
+      if (!this.schema) throw new Error("Schema not defined for this model");
+
+      const populatedDoc = { ...doc };
+
+      for (const [key, field] of Object.entries(this.schema.getDefinition())) {
+        if (typeof field.ref === 'function' && 'findOne' in field.ref) {
+          const relatedModel = field.ref as RelatedModel<Document>;
+          // si la relacion es 1:N (array de ids)
+          if (Array.isArray(doc[key])) {
+            (populatedDoc as any)[key] = await Promise.all (
+              (doc[key] as string[]).map(id => relatedModel.findOne(id))
+            );
+        }
+
+        // si es de 1: 1 (un unico id)
+        else if (doc[key]) {
+          (populatedDoc as any)[key] = await relatedModel.findOne(doc[key]);        }
+      } else {
+        throw new Error(`Invalid reference field: ${key}`);
+      }
+    }
+
+    return populatedDoc;
+  }
+
+  /**
    * Busca documentos que cumplan con el query dado.
    */
   static async find<T extends Document>(query: any): Promise<T[]> {
@@ -111,7 +148,7 @@ export abstract class PouchifyModel<T extends Document> {
   /**
    * Eliminar un documento por su ID.
    */
-  static async remove<T extends Document>(id: string): Promise<void> {
+  static async delete<T extends Document>(id: string): Promise<void> {
     if (!this.db) throw new Error("Database not initialized");
   
     try {

@@ -2,7 +2,7 @@ import { describe, it, expect, beforeAll, beforeEach } from "vitest";
 import PouchDB from "pouchdb-core";
 import "pouchdb-adapter-memory"; // Asegúrate de que el adaptador esté importado
 import "pouchdb-find";          // Importa pouchdb-find para consultas
-import { UserModel } from "../src/models/UserModel";
+import { UserModel } from "../models/user.model";
 
 // Configuración del adaptador en memoria
 PouchDB.plugin(require("pouchdb-adapter-memory"));
@@ -65,7 +65,7 @@ describe("UserModel", () => {
     it("Debería eliminar un usuario", async () => {
         const [user] = await UserModel.find({ selector: { name: "Alice" } });
         if (user && user._id) {
-            await UserModel.remove(user._id);
+            await UserModel.delete(user._id);
             const deletedUser = await UserModel.findOne(user._id);
             expect(deletedUser).toBeNull(); // Debe retornar null
         } else {

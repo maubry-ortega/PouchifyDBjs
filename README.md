@@ -81,11 +81,9 @@ Para reportar problemas, abre un issue en el repositorio de GitHub.
 
 Si este proyecto te resulta útil, considera apoyar su desarrollo mediante una donación:
 
-- PayPal: [https://paypal.me/maubryortega](https://paypal.me/maubryortega)
-- Buy Me a Coffee: [https://www.buymeacoffee.com/maubryortega](https://www.buymeacoffee.com/maubryortega)
-- Ko-fi: [https://ko-fi.com/maubryortega](https://ko-fi.com/maubryortega)
+- PayPal: [https://www.paypal.com/donate/?hosted_button_id=XKTFFRHE7PA9W](https://www.paypal.com/donate/?hosted_button_id=XKTFFRHE7PA9W)
 
-También puedes contactarnos para donaciones corporativas o consultas personalizadas en: maubry.ortega@example.com.
+También puedes contactarnos para donaciones corporativas o consultas personalizadas en: ortegamaubry@gmail.com.
 
 ## Licencia
 
